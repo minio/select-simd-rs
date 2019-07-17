@@ -1,0 +1,6 @@
+# IDE specific
+.idea
+
+# Cargo built
+target/
+
