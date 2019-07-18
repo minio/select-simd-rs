@@ -23,11 +23,9 @@ mod parse_tests {
     
     #[test]
     fn test_detect_separator() {
-        let mut f = File::open("/home/ec2-user/go/src/github.com/minio/select-simd/parking-citations-10K.csv").unwrap();
         let mut message = Vec::new();
-    
-        // read the whole file
-        f.read_to_end(&mut message).unwrap();
+        let mut f = File::open("tests/parking-citations-10K.csv").unwrap();
+        f.read_to_end(&mut message).unwrap(); // read the whole file
 
         let indices_vec: Vec<u32> = vec![0, 207, 333, 455, 575, 683, 812, 939, 1066, 1193, 1314, 1437, 1560, 1683, 1806, 1925,
 											2045, 2162, 2281, 2404, 2524, 2637, 2737, 2867, 2993, 3118, 3237, 3353, 3472, 3582, 3705, 3823,

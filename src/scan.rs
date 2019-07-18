@@ -23,11 +23,9 @@ mod scan_tests {
     
     #[test]
     fn test_scan_delimiter() {
-        let mut f = File::open("/home/ec2-user/go/src/github.com/minio/select-simd/parking-citations-10K.csv").unwrap();
         let mut message = Vec::new();
-    
-        // read the whole file
-        f.read_to_end(&mut message).unwrap();
+        let mut f = File::open("tests/parking-citations-10K.csv").unwrap();
+        f.read_to_end(&mut message).unwrap(); // read the whole file
 
         let indices_vec: Vec<u32> = vec![0; 64];
 
