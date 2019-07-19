@@ -17,38 +17,59 @@
 #[cfg(test)]
 mod parse_tests {
     use super::*;
-    use std::io::prelude::*;
-    use std::fs::File;
     use std::convert::TryInto;
-    
+    use std::fs::File;
+    use std::io::prelude::*;
+
     #[test]
     fn test_detect_separator() {
         let mut message = Vec::new();
         let mut f = File::open("tests/parking-citations-10K.csv").unwrap();
         f.read_to_end(&mut message).unwrap(); // read the whole file
 
-        let indices_vec: Vec<u32> = vec![0, 207, 333, 455, 575, 683, 812, 939, 1066, 1193, 1314, 1437, 1560, 1683, 1806, 1925,
-											2045, 2162, 2281, 2404, 2524, 2637, 2737, 2867, 2993, 3118, 3237, 3353, 3472, 3582, 3705, 3823,
-											3942, 4069, 4196, 4319, 4450, 4578, 4706, 4831, 4947, 5072, 5194, 5318, 5454, 5570, 5692, 5818,
-											5941, 6070, 6195, 6320, 6438, 6564, 6688, 6812, 6936, 7056, 7185, 7302, 7428, 7556, 7686, 7815];
+        let indices_vec: Vec<u32> = vec![
+            0, 207, 333, 455, 575, 683, 812, 939, 1066, 1193, 1314, 1437, 1560, 1683, 1806, 1925,
+            2045, 2162, 2281, 2404, 2524, 2637, 2737, 2867, 2993, 3118, 3237, 3353, 3472, 3582,
+            3705, 3823, 3942, 4069, 4196, 4319, 4450, 4578, 4706, 4831, 4947, 5072, 5194, 5318,
+            5454, 5570, 5692, 5818, 5941, 6070, 6195, 6320, 6438, 6564, 6688, 6812, 6936, 7056,
+            7185, 7302, 7428, 7556, 7686, 7815,
+        ];
         let separator_indices_vec: Vec<u32> = vec![0; 64];
 
-        detect_separator(message.as_ptr(), indices_vec.as_ptr(), indices_vec.len().try_into().unwrap(), separator_indices_vec.as_ptr(), 8, 0x2c);
+        let entries = detect_separator(
+            message.as_ptr(),
+            indices_vec.as_ptr(),
+            indices_vec.len().try_into().unwrap(),
+            separator_indices_vec.as_ptr(),
+            8,
+            0x2c,
+        );
 
-		static EXPECTED: &'static [u32] = &[94, 256, 382, 504, 618, 731, 859, 988, 1115, 1241, 1363, 1486, 1609, 1732, 1854, 1974,
-											2094, 2211, 2330, 2447, 2573, 2686, 2786, 2916, 3042, 3166, 3285, 3401, 3520, 3630, 3753, 3871,
-											3990, 4117, 4245, 4368, 4499, 4627, 4759, 4878, 5002, 5125, 5248, 5367, 5497, 5619, 5741, 5867,
-											0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+        static EXPECTED: &'static [u32] = &[
+            94, 256, 382, 504, 618, 731, 859, 988, 1115, 1241, 1363, 1486, 1609, 1732, 1854, 1974,
+            2094, 2211, 2330, 2447, 2573, 2686, 2786, 2916, 3042, 3166, 3285, 3401, 3520, 3630,
+            3753, 3871, 3990, 4117, 4245, 4368, 4499, 4627, 4759, 4878, 5002, 5125, 5248, 5367,
+            5497, 5619, 5741, 5867, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        ];
 
+        assert_eq!(entries, 48);
         assert_eq!(separator_indices_vec, EXPECTED);
     }
 }
 
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-pub fn detect_separator(message_ptr: *const u8, indices_ptr: *const u32, indices_len: u64, separator_indices_ptr: *const u32, num_separator: u64, separator_char: u64) {
+pub fn detect_separator(
+    message_ptr: *const u8,
+    indices_ptr: *const u32,
+    indices_len: u64,
+    separator_indices_ptr: *const u32,
+    num_separator: u64,
+    separator_char: u64,
+) -> u64 {
+    let entries: u64;
     unsafe {
         asm!("
-    jmp main
+    jmp parse_main
 
 detect_separator:
 	vpbroadcastd  zmm28, ebx
@@ -61,7 +82,7 @@ detect_separator:
 	vpxord        zmm2, zmm2, zmm2
 	vpcmpgtd      k5, zmm1, zmm0
 
-loop:
+detect_separator_loop:
 	vpgatherdd    zmm25 {k5}, [rsi+zmm0*1]
 	vpcmpeqb      k5, zmm25, zmm31
 	vpmovm2b      zmm26, k5
@@ -94,17 +115,17 @@ loop:
 	vmovdqa32     zmm2 {k3}, zmm0
 	vpcmpgtd      k5, zmm1, zmm0
 	ktestq        k5, k5
-	jz            done
+	jz            detect_separator_done
 	vpcmpgtd      k3, zmm28, zmm29
 	ktestq        k3, k3
-	jnz           loop
+	jnz           detect_separator_loop
 
-done:
+detect_separator_done:
 	kmovq         rcx, k6
 	kmovq         rbx, k7
-	ret  
+	ret
 
-main:
+parse_main:
 	shl           r11, 0x02
 	sub           r11, 0x40					// fix overrun
 	mov           r10, 0x01
@@ -112,7 +133,7 @@ main:
 	mov           r10, 0x00
 	vmovdqu32     zmm0, zmmword ptr [rdi+r10*1]
 
-mainloop:
+parse_main_loop:
 	vmovdqu32     zmm4, zmmword ptr [rdi+r10*1+0x40]
 	valignd       zmm1, zmm4, zmm0, 0x01
 	vpsubd        zmm1, zmm1, zmm8
@@ -121,10 +142,10 @@ mainloop:
 	vmovdqa64     zmm0, zmm4
 	add           r10, 0x40
 	cmp           r10, r11
-	jl            mainloop
-	mov           qword ptr [rsp+0x60], r10
+	jl            parse_main_loop
+	shr           r10, 0x2
 	vzeroupper"
-             :
+             : "={r10}"(entries)
              : "{rsi}"(message_ptr),
                "{rdi}"(indices_ptr),
                "{r11}"(indices_len),
@@ -133,4 +154,5 @@ mainloop:
                "{rcx}"(separator_char)
              :: "intel" );
     }
+    entries
 }

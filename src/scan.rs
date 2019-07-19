@@ -17,10 +17,10 @@
 #[cfg(test)]
 mod scan_tests {
     use super::*;
-    use std::io::prelude::*;
-    use std::fs::File;
     use std::convert::TryInto;
-    
+    use std::fs::File;
+    use std::io::prelude::*;
+
     #[test]
     fn test_scan_delimiter() {
         let mut message = Vec::new();
@@ -29,24 +29,43 @@ mod scan_tests {
 
         let indices_vec: Vec<u32> = vec![0; 64];
 
-        let end_pos = scan_delimiter(message.as_ptr(), message.len().try_into().unwrap(), indices_vec.as_ptr(), indices_vec.len().try_into().unwrap(), 0, 0x0a);
-        assert_eq!(end_pos, 7943);
+        let result = scan_delimiter(
+            message.as_ptr(),
+            message.len().try_into().unwrap(),
+            indices_vec.as_ptr(),
+            indices_vec.len().try_into().unwrap(),
+            0,
+            0x0a,
+        );
+        assert_eq!(result.0, 7943);
 
-		static EXPECTED: &'static [u32] = &[0, 207, 333, 455, 575, 683, 812, 939, 1066, 1193, 1314, 1437, 1560, 1683, 1806, 1925,
-											2045, 2162, 2281, 2404, 2524, 2637, 2737, 2867, 2993, 3118, 3237, 3353, 3472, 3582, 3705, 3823,
-											3942, 4069, 4196, 4319, 4450, 4578, 4706, 4831, 4947, 5072, 5194, 5318, 5454, 5570, 5692, 5818,
-											5941, 6070, 6195, 6320, 6438, 6564, 6688, 6812, 6936, 7056, 7185, 7302, 7428, 7556, 7686, 7815];
+        static EXPECTED: &'static [u32] = &[
+            0, 207, 333, 455, 575, 683, 812, 939, 1066, 1193, 1314, 1437, 1560, 1683, 1806, 1925,
+            2045, 2162, 2281, 2404, 2524, 2637, 2737, 2867, 2993, 3118, 3237, 3353, 3472, 3582,
+            3705, 3823, 3942, 4069, 4196, 4319, 4450, 4578, 4706, 4831, 4947, 5072, 5194, 5318,
+            5454, 5570, 5692, 5818, 5941, 6070, 6195, 6320, 6438, 6564, 6688, 6812, 6936, 7056,
+            7185, 7302, 7428, 7556, 7686, 7815,
+        ];
 
         assert_eq!(indices_vec, EXPECTED);
     }
 }
 
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-pub fn scan_delimiter(message_ptr: *const u8, message_len: u64, indices_ptr: *const u32, indices_len: u64, start_pos: u64, delimiter: u64) -> u64 {
+pub fn scan_delimiter(
+    message_ptr: *const u8,
+    message_len: u64,
+    indices_ptr: *const u32,
+    indices_len: u64,
+    start_pos: u64,
+    delimiter: u64,
+) -> (u64, u64) {
     let end_pos: u64;
+    let entries: u64;
+
     unsafe {
         asm!("
-    jmp main
+    jmp scan_main
 
 scan_delimiters:
 	kmovq         k7, rax
@@ -57,88 +76,90 @@ scan_delimiters:
 	vpbroadcastd  zmm28, ebx
 	and           rcx, 0x3F
 	cmp           rcx, 0x00
-	jnz           initialAlignedLoad
-	
-loop:
+	jnz           scan_initialAlignedLoad
+
+scan_loop:
 	vpcmpeqb      k4, zmm0, zmmword ptr [rsi+rbx*1]
 
-afterAlignedLoad:
+scan_afterAlignedLoad:
 	kmovq         rax, k4
 	cmp           rax, 0x00
-	jz            skipCtz
+	jz            scan_skipCtz
 
-loopCtz:
+scan_loopCtz:
 	tzcnt         r10, rax
 	add           rdx, 0x01
 	add           r10, rbx
 	blsr          rax, rax
 	vpbroadcastd  zmm29, r10d
 	valignd       zmm30, zmm29, zmm30, 0x01
-	jnz           loopCtz
+	jnz           scan_loopCtz
 
-skipCtz:
+scan_skipCtz:
 	add           rbx, 0x40
 	cmp           rbx, r9
-	jnl           done
+	jnl           scan_done
 	cmp           rdx, 0x10
-	jl            loop
+	jl            scan_loop
 
-done:
+scan_done:
 	vpextrd       ecx, xmm29, 0x00
 	add           rcx, 0x01
 	cmp           rdx, 0x10
-	jl            shiftOutput
+	jl            scan_shiftOutput
 
-afterShiftOutput:
+scan_afterShiftOutput:
 	mov           rax, 0x01
 	vpbroadcastd  zmm31, eax
 	vpaddd        zmm30, zmm30, zmm31
 	valignd       zmm0, zmm30, zmm28, 0x0F
 	kmovq         r10, k6
 	kmovq         rax, k7
-	ret  
+	ret
 
-initialAlignedLoad:
+scan_initialAlignedLoad:
 	mov           rax, 0x01
 	shl           rax, cl
 	kmovq         k4, rax
 	sub           rbx, rcx
 	vpcmpeqb      k4 {k4}, zmm0, zmmword ptr [rsi+rbx*1]
-	jmp           afterAlignedLoad
+	jmp           scan_afterAlignedLoad
 
-shiftOutput:
+scan_shiftOutput:
 	mov           rax, rdx
 
-shiftOutputLoop:
+scan_shiftOutputLoop:
 	valignd       zmm30, zmm29, zmm30, 0x01
 	inc           rax
 	cmp           rax, 0x10
-	jl            shiftOutputLoop
-	jmp           afterShiftOutput
+	jl            scan_shiftOutputLoop
+	jmp           scan_afterShiftOutput
 
-main:
+scan_main:
     shl           r10, 0x02
 	xor           r12, r12
 	xor           r13, r13
 
-mainloop:
+scan_main_loop:
 	call		  scan_delimiters
 	vmovdqu32     zmmword ptr [r11+r12*1], zmm0
 	add           r13, rdx
 	cmp           rdx, 0x10
-	jnz           done
+	jnz           scan_main_done
 	mov           r8, r9
 	sub           r8, 0x40
 	cmp           rbx, r8
-	jnl           maindone
+	jnl           scan_main_done
 	add           r12, 0x40
 	cmp           r12, r10
-	jl            mainloop
+	jl            scan_main_loop
 
-maindone:
+scan_main_done:
 	mov           rax, rcx
+	shr           r12, 0x02
 	vzeroupper"
-             : "=r"(end_pos)
+             : "={rax}"(end_pos),
+               "={r12}"(entries)
              : "{rsi}"(message_ptr),
                "{r9}"(message_len),
                "{r11}"(indices_ptr),
@@ -147,5 +168,5 @@ maindone:
                "{rax}"(delimiter)
              :: "intel" );
     }
-    end_pos
+    (end_pos, entries)
 }
