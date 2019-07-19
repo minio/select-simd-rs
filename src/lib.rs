@@ -18,6 +18,8 @@
 
 mod scan;
 mod parse;
+mod conv;
+mod util;
 
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 pub fn test_args(a: i32, b: i32, message_ptr: *const u8, buf_ptr: *const u8) -> i32 {
