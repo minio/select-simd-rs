@@ -18,6 +18,7 @@
 
 mod scan;
 mod parse;
+mod eval;
 mod conv;
 mod util;
 
