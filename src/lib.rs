@@ -16,59 +16,87 @@
 
 #![feature(asm)]
 
-mod scan;
-mod parse;
-mod eval;
 mod conv;
+mod eval;
+mod parse;
+mod scan;
 mod util;
-
-#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-pub fn test_args(a: i32, b: i32, message_ptr: *const u8, buf_ptr: *const u8) -> i32 {
-    let c: i32;
-    unsafe {
-        asm!("
-    add $0, $2
-	mov           rax, 0x40
-	vpbroadcastb  zmm2, eax
-    vmovdqu32     [rcx], zmm2 
-	mov           rax, 0x17
-	vpbroadcastb  zmm3, eax
-    vmovdqu32     [rdx], zmm3 
-"
-             : "=r"(c)
-             : "0"(a), "r"(b), "{rdx}"(message_ptr), "{rcx}"(buf_ptr)
-             :: "intel" );
-    }
-    c
-}
-
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::io::prelude::*;
+    use std::convert::TryInto;
     use std::fs::File;
-    
+    use std::io::prelude::*;
+
     #[test]
-    fn test_arguments() {
-        let mut f = File::open("/home/ec2-user/go/src/github.com/minio/select-simd/parking-citations-10K.csv").unwrap();
-        let mut buffer = Vec::new();
-    
-        // read the whole file
-        f.read_to_end(&mut buffer).unwrap();
+    fn test_query() {
+        let mut message = Vec::new();
+        let mut f = File::open("tests/parking-citations-10K.csv").unwrap();
+        f.read_to_end(&mut message).unwrap(); // read the whole file
 
-        let zero_vec = vec![0; 128];
+        let size: usize = 10000 / 64;
+        let indices_vec: Vec<u32> = vec![0; size * 64];
 
-        let buffer_ptr: *const u8 = buffer.as_ptr();
-        let zero_ptr: *const u8 = zero_vec.as_ptr();
-        assert_eq!(test_args(7, 13, buffer_ptr, zero_ptr), 20);
+        let _result = scan::scan_delimiter(
+            message.as_ptr(),
+            message.len().try_into().unwrap(),
+            indices_vec.as_ptr(),
+            indices_vec.len().try_into().unwrap(),
+            0,
+            0x0a,
+        );
 
-        println!("{:?}", zero_vec);
-        println!("{:?}", &buffer[..128]);
-        
-        // scan_delimiters
-        // detect_separators
-        // eval_string_compare
-        // 
+        let make_indices_vec: Vec<u32> = vec![0; indices_vec.len()];
+
+        parse::detect_separator(
+            message.as_ptr(),
+            indices_vec.as_ptr(),
+            indices_vec.len().try_into().unwrap(),
+            make_indices_vec.as_ptr(),
+            8,
+            0x2c,
+        );
+
+        let active_vec: Vec<u32> = vec![0; 2048];
+
+        const HONDA: u32 = 0x444e4f48;
+
+        let _count = eval::eval_string_equal(
+            message.as_ptr(),
+            make_indices_vec.as_ptr(),
+            make_indices_vec.len().try_into().unwrap(),
+            HONDA,
+            active_vec.as_ptr(),
+            active_vec.len().try_into().unwrap(),
+        );
+
+        let fine_size: usize = make_indices_vec.len() / 64;
+        let fine_indices_vec: Vec<u32> = vec![0; fine_size * 64];
+
+        parse::detect_separator(
+            message.as_ptr(),
+            active_vec.as_ptr(),
+            active_vec.len().try_into().unwrap(),
+            fine_indices_vec.as_ptr(),
+            8,
+            0x2c,
+        );
+
+        let mut fine_indices_vec64: Vec<u64> = vec![0; fine_size * 64];
+        for v in fine_indices_vec.iter().enumerate() {
+            fine_indices_vec64[v.0] = *v.1 as u64;
+        }
+
+        let i64s_vec: Vec<i64> = vec![0; 8];
+        conv::conv_atoi64(
+            message.as_ptr(),
+            fine_indices_vec64.as_ptr(),
+            i64s_vec.as_ptr(),
+        );
+
+        static EXPECTED: &'static [i64] = &[50, 73, 50, 93, 363, 50, 50, 50];
+
+        assert_eq!(i64s_vec, EXPECTED);
     }
 }
