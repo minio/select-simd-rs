@@ -65,9 +65,9 @@ pub fn scan_delimiter(
 
     unsafe {
         asm!("
-    jmp scan_main
+    jmp scan_main${:uid}
 
-scan_delimiters:
+scan_delimiters${:uid}:
 	kmovq         k7, rax
 	kmovq         k6, r10
 	vpbroadcastb  zmm0, eax
@@ -76,39 +76,39 @@ scan_delimiters:
 	vpbroadcastd  zmm28, ebx
 	and           rcx, 0x3F
 	cmp           rcx, 0x00
-	jnz           scan_initialAlignedLoad
+	jnz           scan_initialAlignedLoad${:uid}
 
-scan_loop:
+scan_loop${:uid}:
 	vpcmpeqb      k4, zmm0, zmmword ptr [rsi+rbx*1]
 
-scan_afterAlignedLoad:
+scan_afterAlignedLoad${:uid}:
 	kmovq         rax, k4
 	cmp           rax, 0x00
-	jz            scan_skipCtz
+	jz            scan_skipCtz${:uid}
 
-scan_loopCtz:
+scan_loopCtz${:uid}:
 	tzcnt         r10, rax
 	add           rdx, 0x01
 	add           r10, rbx
 	blsr          rax, rax
 	vpbroadcastd  zmm29, r10d
 	valignd       zmm30, zmm29, zmm30, 0x01
-	jnz           scan_loopCtz
+	jnz           scan_loopCtz${:uid}
 
-scan_skipCtz:
+scan_skipCtz${:uid}:
 	add           rbx, 0x40
 	cmp           rbx, r9
-	jnl           scan_done
+	jnl           scan_done${:uid}
 	cmp           rdx, 0x10
-	jl            scan_loop
+	jl            scan_loop${:uid}
 
-scan_done:
+scan_done${:uid}:
 	vpextrd       ecx, xmm29, 0x00
 	add           rcx, 0x01
 	cmp           rdx, 0x10
-	jl            scan_shiftOutput
+	jl            scan_shiftOutput${:uid}
 
-scan_afterShiftOutput:
+scan_afterShiftOutput${:uid}:
 	mov           rax, 0x01
 	vpbroadcastd  zmm31, eax
 	vpaddd        zmm30, zmm30, zmm31
@@ -117,44 +117,44 @@ scan_afterShiftOutput:
 	kmovq         rax, k7
 	ret
 
-scan_initialAlignedLoad:
+scan_initialAlignedLoad${:uid}:
 	mov           rax, 0x01
 	shl           rax, cl
 	kmovq         k4, rax
 	sub           rbx, rcx
 	vpcmpeqb      k4 {k4}, zmm0, zmmword ptr [rsi+rbx*1]
-	jmp           scan_afterAlignedLoad
+	jmp           scan_afterAlignedLoad${:uid}
 
-scan_shiftOutput:
+scan_shiftOutput${:uid}:
 	mov           rax, rdx
 
-scan_shiftOutputLoop:
+scan_shiftOutputLoop${:uid}:
 	valignd       zmm30, zmm29, zmm30, 0x01
 	inc           rax
 	cmp           rax, 0x10
-	jl            scan_shiftOutputLoop
-	jmp           scan_afterShiftOutput
+	jl            scan_shiftOutputLoop${:uid}
+	jmp           scan_afterShiftOutput${:uid}
 
-scan_main:
+scan_main${:uid}:
     shl           r10, 0x02
 	xor           r12, r12
 	xor           r13, r13
 
-scan_main_loop:
-	call		  scan_delimiters
+scan_main_loop${:uid}:
+	call		  scan_delimiters${:uid}
 	vmovdqu32     zmmword ptr [r11+r12*1], zmm0
 	add           r13, rdx
 	cmp           rdx, 0x10
-	jnz           scan_main_done
+	jnz           scan_main_done${:uid}
 	mov           r8, r9
 	sub           r8, 0x40
 	cmp           rbx, r8
-	jnl           scan_main_done
+	jnl           scan_main_done${:uid}
 	add           r12, 0x40
 	cmp           r12, r10
-	jl            scan_main_loop
+	jl            scan_main_loop${:uid}
 
-scan_main_done:
+scan_main_done${:uid}:
 	mov           rax, rcx
 	shr           r12, 0x02
 	vzeroupper"
@@ -166,7 +166,8 @@ scan_main_done:
                "{r10}"(indices_len),
                "{rcx}"(start_pos),
                "{rax}"(delimiter)
-             :: "intel" );
+             : "rax", "rbx", "rcx", "rdx", "rsi", "rdi", "r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15"
+             : "intel" );
     }
     (end_pos, entries)
 }

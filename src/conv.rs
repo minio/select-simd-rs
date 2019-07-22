@@ -124,9 +124,9 @@ mod conv_tests {
 pub fn conv_atoi64(message_ptr: *const u8, indices_ptr: *const u64, i64_ptr: *const i64) {
     unsafe {
         asm!("
-    jmp main_atoi64
+    jmp main_atoi64${:uid}
 
-conv_atoi64:
+conv_atoi64${:uid}:
 	mov           rcx, 0x30
 	vpbroadcastb  zmm30, ecx
 	mov           rcx, 0x0A
@@ -138,7 +138,7 @@ conv_atoi64:
 	vpxorq        zmm1, zmm1, zmm1
 	mov           rax, rsi
 
-loop:
+conv_atoi64_loop${:uid}:
 	knotq         k6, k0
 	vpgatherqq    zmm31 {k6}, [rax+zmm0*1]
 	add           rax, 0x08
@@ -174,7 +174,7 @@ loop:
 	vpaddq        zmm1 {k7}, zmm1, zmm25
 	kmovq         rcx, k7
 	cmp           rcx, 0x00
-	jz            done
+	jz            conv_atoi64_done${:uid}
 	vpsrlq        zmm31, zmm31, 0x08
 	vpsllq        zmm27, zmm28, 0x18
 	vpmovq2m      k6, zmm27
@@ -205,19 +205,20 @@ loop:
 	vpaddq        zmm1 {k7}, zmm1, zmm25
 	kmovq         rcx, k7
 	cmp           rcx, 0x00
-	jnz           loop
-done:
+	jnz           conv_atoi64_loop${:uid}
+conv_atoi64_done${:uid}:
 	ret
 
-main_atoi64:
+main_atoi64${:uid}:
 	vmovdqu32     zmm0, zmmword ptr [rdi]
-	call          conv_atoi64
+	call          conv_atoi64${:uid}
 	vmovdqu32     zmmword ptr [r11], zmm1
 	vzeroupper"
              :
              : "{rsi}"(message_ptr),
                "{rdi}"(indices_ptr),
                "{r11}"(i64_ptr)
-             :: "intel" );
+             : "rax", "rbx", "rcx", "rdx", "rsi", "rdi", "r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15"
+             : "intel" );
     }
 }

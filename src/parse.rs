@@ -69,9 +69,9 @@ pub fn detect_separator(
     let entries: u64;
     unsafe {
         asm!("
-    jmp parse_main
+    jmp parse_main${:uid}
 
-detect_separator:
+detect_separator${:uid}:
 	vpbroadcastd  zmm28, ebx
 	vpbroadcastb  zmm31, ecx
 	kmovq         k7, rbx
@@ -82,7 +82,7 @@ detect_separator:
 	vpxord        zmm2, zmm2, zmm2
 	vpcmpgtd      k5, zmm1, zmm0
 
-detect_separator_loop:
+detect_separator_loop${:uid}:
 	vpgatherdd    zmm25 {k5}, [rsi+zmm0*1]
 	vpcmpeqb      k5, zmm25, zmm31
 	vpmovm2b      zmm26, k5
@@ -115,17 +115,17 @@ detect_separator_loop:
 	vmovdqa32     zmm2 {k3}, zmm0
 	vpcmpgtd      k5, zmm1, zmm0
 	ktestq        k5, k5
-	jz            detect_separator_done
+	jz            detect_separator_done${:uid}
 	vpcmpgtd      k3, zmm28, zmm29
 	ktestq        k3, k3
-	jnz           detect_separator_loop
+	jnz           detect_separator_loop${:uid}
 
-detect_separator_done:
+detect_separator_done${:uid}:
 	kmovq         rcx, k6
 	kmovq         rbx, k7
 	ret
 
-parse_main:
+parse_main${:uid}:
 	shl           r11, 0x02
 	sub           r11, 0x40					// fix overrun
 	mov           r10, 0x01
@@ -133,16 +133,16 @@ parse_main:
 	mov           r10, 0x00
 	vmovdqu32     zmm0, zmmword ptr [rdi+r10*1]
 
-parse_main_loop:
+parse_main_loop${:uid}:
 	vmovdqu32     zmm4, zmmword ptr [rdi+r10*1+0x40]
 	valignd       zmm1, zmm4, zmm0, 0x01
 	vpsubd        zmm1, zmm1, zmm8
-	call          detect_separator
+	call          detect_separator${:uid}
 	vmovdqu32     zmmword ptr [r8+r10*1], zmm2
 	vmovdqa64     zmm0, zmm4
 	add           r10, 0x40
 	cmp           r10, r11
-	jl            parse_main_loop
+	jl            parse_main_loop${:uid}
 	shr           r10, 0x2
 	vzeroupper"
              : "={r10}"(entries)
@@ -152,7 +152,8 @@ parse_main_loop:
                "{r8}"(separator_indices_ptr),
                "{rbx}"(num_separator),
                "{rcx}"(separator_char)
-             :: "intel" );
+             : "rax", "rbx", "rcx", "rdx", "rsi", "rdi", "r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15"
+             : "intel" );
     }
     entries
 }

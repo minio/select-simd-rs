@@ -88,9 +88,9 @@ pub fn eval_string_equal(
     let entries: u64;
     unsafe {
         asm!("
-    jmp eval_main
+    jmp eval_main${:uid}
 
-eval_string_equal:
+eval_string_equal${:uid}:
 	knotq         k4, k0
 	knotq         k5, k0
 	knotq         k6, k0
@@ -111,18 +111,18 @@ eval_string_equal:
 	korq          k1, k4, k7
 	ret
 
-eval_main:
+eval_main${:uid}:
     shl           r9, 0x02
     add           r9, rdi
 	xor           r13, r13
 
-eval_main_loop:
+eval_main_loop${:uid}:
 	vmovdqu32     zmm4, zmmword ptr [rdi]
 	vmovdqu32     zmm5, zmmword ptr [rdi+0x40]
 	vmovdqu32     zmm6, zmmword ptr [rdi+0x80]
 	vmovdqu32     zmm7, zmmword ptr [rdi+0xc0]
 	vpbroadcastd  zmm2, ecx
-    call          eval_string_equal
+    call          eval_string_equal${:uid}
 
     mov           rbx, r13
 	vpcompressd   zmmword ptr [r14+rbx*4] {k1}, zmm4
@@ -151,12 +151,12 @@ eval_main_loop:
 
     mov           r13, rbx
 	cmp           r13, r15
-	jnl           eval_done
+	jnl           eval_done${:uid}
     add           rdi, 0x100
 	cmp           rdi, r9
-	jl            eval_main_loop
+	jl            eval_main_loop${:uid}
 
-eval_done:
+eval_done${:uid}:
 	vzeroupper"
              : "={r13}"(entries)
              : "{rsi}"(message_ptr),
@@ -165,7 +165,8 @@ eval_done:
                "{rcx}"(pattern),
                "{r14}"(active_ptr),
                "{r15}"(active_len)
-             :: "intel" );
+             : "rax", "rbx", "rcx", "rdx", "rsi", "rdi", "r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15"
+             : "intel" );
     }
     return entries;
 }
