@@ -15,6 +15,9 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #![feature(asm)]
+#![feature(test)]
+
+extern crate test;
 
 mod conv;
 mod eval;
@@ -28,6 +31,7 @@ mod tests {
     use std::convert::TryInto;
     use std::fs::File;
     use std::io::prelude::*;
+    use test::Bencher;
 
     #[test]
     fn test_query() {
@@ -74,7 +78,7 @@ mod tests {
         let fine_size: usize = make_indices_vec.len() / 64;
         let fine_indices_vec: Vec<u32> = vec![0; fine_size * 64];
 
-        parse::detect_separator(
+        let _entries = parse::detect_separator(
             message.as_ptr(),
             active_vec.as_ptr(),
             active_vec.len().try_into().unwrap(),
@@ -99,4 +103,28 @@ mod tests {
 
         assert_eq!(i64s_vec, EXPECTED);
     }
+
+    #[bench]
+    fn bench_query_scan(b: &mut Bencher) {
+        let mut message = Vec::new();
+        let mut f = File::open("tests/parking-citations-10K.csv").unwrap();
+        f.read_to_end(&mut message).unwrap(); // read the whole file
+
+        let size: usize = 10000 / 64;
+        let indices_vec: Vec<u32> = vec![0; size * 64];
+
+        let make_indices_vec: Vec<u32> = vec![0; indices_vec.len()];
+
+        b.iter(|| {
+            scan::scan_delimiter(
+                message.as_ptr(),
+                message.len().try_into().unwrap(),
+                indices_vec.as_ptr(),
+                indices_vec.len().try_into().unwrap(),
+                0,
+                0x0a,
+            )
+        });
+    }
+
 }
