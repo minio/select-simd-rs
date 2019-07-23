@@ -22,3 +22,4 @@ This package is in early development and does not yet cover a wide range of oper
 ### Single core
 
 bench_query_scan ... bench:      50,571 ns/iter (+/- 763) --> 24.5 GB/s
+bench_query_parse ... bench:      6,877 ns/iter (+/- 28)

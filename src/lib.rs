@@ -113,8 +113,6 @@ mod tests {
         let size: usize = 10000 / 64;
         let indices_vec: Vec<u32> = vec![0; size * 64];
 
-        let make_indices_vec: Vec<u32> = vec![0; indices_vec.len()];
-
         b.iter(|| {
             scan::scan_delimiter(
                 message.as_ptr(),
@@ -123,6 +121,38 @@ mod tests {
                 indices_vec.len().try_into().unwrap(),
                 0,
                 0x0a,
+            )
+        });
+    }
+
+    #[bench]
+    fn bench_query_parse(b: &mut Bencher) {
+        let mut message = Vec::new();
+        let mut f = File::open("tests/parking-citations-10K.csv").unwrap();
+        f.read_to_end(&mut message).unwrap(); // read the whole file
+
+        let size: usize = 10000 / 64;
+        let indices_vec: Vec<u32> = vec![0; size * 64];
+
+        let make_indices_vec: Vec<u32> = vec![0; indices_vec.len()];
+
+        let _result = scan::scan_delimiter(
+            message.as_ptr(),
+            message.len().try_into().unwrap(),
+            indices_vec.as_ptr(),
+            indices_vec.len().try_into().unwrap(),
+            0,
+            0x0a,
+        );
+
+        b.iter(|| {
+            parse::detect_separator(
+                message.as_ptr(),
+                indices_vec.as_ptr(),
+                indices_vec.len().try_into().unwrap(),
+                make_indices_vec.as_ptr(),
+                8,
+                0x2c,
             )
         });
     }
