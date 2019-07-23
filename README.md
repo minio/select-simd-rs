@@ -17,3 +17,8 @@ This package is in early development and does not yet cover a wide range of oper
 - support large objects (> 4 GB)
 - embedded assembly
 
+## Performance
+
+### Single core
+
+bench_query_scan ... bench:      50,571 ns/iter (+/- 763) --> 24.5 GB/s
