@@ -29,14 +29,17 @@ mod util;
 mod tests {
     use super::*;
     use std::convert::TryInto;
+    use std::fs;
     use std::fs::File;
     use std::io::prelude::*;
     use test::Bencher;
 
+    static TEST_FILE: &str = "tests/parking-citations-10K.csv";
+
     #[test]
     fn test_query() {
         let mut message = Vec::new();
-        let mut f = File::open("tests/parking-citations-10K.csv").unwrap();
+        let mut f = File::open(TEST_FILE).unwrap();
         f.read_to_end(&mut message).unwrap(); // read the whole file
 
         let size: usize = 10000 / 64;
@@ -107,7 +110,7 @@ mod tests {
     #[bench]
     fn bench_query_scan(b: &mut Bencher) {
         let mut message = Vec::new();
-        let mut f = File::open("tests/parking-citations-10K.csv").unwrap();
+        let mut f = File::open(TEST_FILE).unwrap();
         f.read_to_end(&mut message).unwrap(); // read the whole file
 
         let size: usize = 10000 / 64;
@@ -123,12 +126,15 @@ mod tests {
                 0x0a,
             )
         });
+
+        let metadata = fs::metadata(TEST_FILE).unwrap();
+        b.bytes = metadata.len();
     }
 
     #[bench]
     fn bench_query_parse(b: &mut Bencher) {
         let mut message = Vec::new();
-        let mut f = File::open("tests/parking-citations-10K.csv").unwrap();
+        let mut f = File::open(TEST_FILE).unwrap();
         f.read_to_end(&mut message).unwrap(); // read the whole file
 
         let size: usize = 10000 / 64;
@@ -155,6 +161,9 @@ mod tests {
                 0x2c,
             )
         });
+
+        let metadata = fs::metadata(TEST_FILE).unwrap();
+        b.bytes = metadata.len();
     }
 
 }
