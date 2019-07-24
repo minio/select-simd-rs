@@ -17,9 +17,6 @@
 #[cfg(test)]
 mod conv_tests {
     use super::*;
-    use std::convert::TryInto;
-    use std::fs::File;
-    use std::io::prelude::*;
 
     #[test]
     fn test_conv_atoi64() {

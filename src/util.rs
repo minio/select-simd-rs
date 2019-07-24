@@ -14,6 +14,22 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use byteorder::{LittleEndian, WriteBytesExt};
+use std::fs::File;
+use std::io::prelude::*;
+
+
+pub fn write_file(filename: &str, data_vec: &Vec<u32>) {
+    let mut fileout = File::create(filename).unwrap();
+
+    let mut result: Vec<u8> = Vec::new();
+    for n in data_vec {
+        let _ = result.write_u32::<LittleEndian>(*n);
+    }
+
+    fileout.write_all(&result).unwrap();
+}
+
 pub fn index_and(a: &Vec<i32>, b: &Vec<i32>) -> Vec<i32> {
     let mut vec: Vec<i32> = Vec::with_capacity((a.len() + b.len()) / 2);
     let mut ai = 0;
